@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LinkedPlaylist;
 
 namespace LinkedPlaylist.Tests;
@@ -122,27 +123,59 @@ public class PlaylistTests
     }
 
     [TestMethod]
-    public void AThousandSongsBothWays()
+    public void ALongUpNextQueueStaysFast()
     {
         Playlist playlist = new Playlist();
-        for (int i = 0; i < 1000; i++)
+        for (int i = 0; i < 100000; i++)
         {
             playlist.Add("Song " + i);
         }
-        int moves = 0;
+        Stopwatch watch = Stopwatch.StartNew();
+        bool TooSlow(int i) => i % 1000 == 0 && watch.Elapsed.TotalSeconds > 2;
+
+        for (int i = 0; i < 50000; i++)
+        {
+            playlist.Next();
+        }
+        for (int i = 0; i < 100000; i++)
+        {
+            playlist.AddAfterCurrent("Next " + i);
+            if (TooSlow(i))
+            {
+                break;
+            }
+        }
+        int forward = 0;
         while (playlist.Next())
         {
-            moves++;
+            forward++;
+            if (TooSlow(forward))
+            {
+                break;
+            }
         }
-        Assert.AreEqual(999, moves, "Not yet: Next moves 999 times through 1,000 songs.");
+        int back = 0;
         while (playlist.Previous())
         {
-            moves--;
+            back++;
+            if (TooSlow(back))
+            {
+                break;
+            }
         }
-        Assert.AreEqual(0, moves, "Not yet: Previous walks all the way back.");
-        while (playlist.RemoveCurrent() != null)
+        for (int i = 0; i < 100000; i++)
         {
+            playlist.RemoveCurrent();
+            if (TooSlow(i))
+            {
+                break;
+            }
         }
-        Assert.AreEqual(0, playlist.Count, "Not yet: removing the current song again and again empties the playlist.");
+        watch.Stop();
+        Assert.IsTrue(watch.Elapsed.TotalSeconds < 2, "Not yet: the long up-next queue ran past 2 seconds: it was stopped at " + watch.Elapsed.TotalSeconds.ToString("0.0") + " seconds. When next, previous, play next and remove each change a few links, the whole run takes well under one second.");
+        Assert.AreEqual(149999, forward, "Not yet: after 100,000 songs go in after Song 50000, next steps 149,999 times to the last song.");
+        Assert.AreEqual(199999, back, "Not yet: previous steps 199,999 times, back to the first song.");
+        Assert.AreEqual(100000, playlist.Count, "Not yet: 100,000 of the 200,000 songs were removed.");
+        Assert.AreEqual("Next 50000", playlist.Current, "Not yet: after the first 100,000 songs are removed from the front, Next 50000 plays.");
     }
 }

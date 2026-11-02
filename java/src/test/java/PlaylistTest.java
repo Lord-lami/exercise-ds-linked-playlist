@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.function.IntPredicate;
 import org.junit.jupiter.api.Test;
 
 // The tests for your playlist. You don't need to change this file.
@@ -111,22 +112,48 @@ class PlaylistTest {
     }
 
     @Test
-    void aThousandSongsBothWays() {
+    void aLongUpNextQueueStaysFast() {
         Playlist playlist = new Playlist();
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 100000; i++) {
             playlist.add("Song " + i);
         }
-        int moves = 0;
+        long started = System.nanoTime();
+        IntPredicate tooSlow = i -> i % 1000 == 0 && System.nanoTime() - started > 2_000_000_000L;
+
+        for (int i = 0; i < 50000; i++) {
+            playlist.next();
+        }
+        for (int i = 0; i < 100000; i++) {
+            playlist.addAfterCurrent("Next " + i);
+            if (tooSlow.test(i)) {
+                break;
+            }
+        }
+        int forward = 0;
         while (playlist.next()) {
-            moves++;
+            forward++;
+            if (tooSlow.test(forward)) {
+                break;
+            }
         }
-        assertEquals(999, moves, "Not yet: next moves 999 times through 1,000 songs.");
+        int back = 0;
         while (playlist.previous()) {
-            moves--;
+            back++;
+            if (tooSlow.test(back)) {
+                break;
+            }
         }
-        assertEquals(0, moves, "Not yet: previous walks all the way back.");
-        while (playlist.removeCurrent() != null) {
+        for (int i = 0; i < 100000; i++) {
+            playlist.removeCurrent();
+            if (tooSlow.test(i)) {
+                break;
+            }
         }
-        assertEquals(0, playlist.count(), "Not yet: removing the current song again and again empties the playlist.");
+        double seconds = (System.nanoTime() - started) / 1e9;
+        assertTrue(seconds < 2, "Not yet: the long up-next queue ran past 2 seconds: it was stopped at %.1f seconds. When next, previous, play next and remove each change a few links, the whole run takes well under one second.".formatted(seconds));
+        assertEquals(149999, forward, "Not yet: after 100,000 songs go in after Song 50000, next steps 149,999 times to the last song.");
+        assertEquals(199999, back, "Not yet: previous steps 199,999 times, back to the first song.");
+        assertEquals(100000, playlist.count(), "Not yet: 100,000 of the 200,000 songs were removed.");
+        assertEquals("Next 50000", playlist.current(), "Not yet: after the first 100,000 songs are removed from the front, Next 50000 plays.");
     }
 }

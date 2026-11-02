@@ -1,5 +1,7 @@
 # The tests for your playlist. You don't need to change this file.
 # Each message says what was expected, so a failing test tells you what to look at.
+import time
+
 from linked_playlist import Playlist
 
 
@@ -95,17 +97,38 @@ def test_remove_the_only_song_and_then_nothing():
     assert playlist.remove_current() is None, "Not yet: an empty playlist has nothing to remove."
 
 
-def test_a_thousand_songs_both_ways():
+def test_a_long_up_next_queue_stays_fast():
     playlist = Playlist()
-    for i in range(1000):
+    for i in range(100000):
         playlist.add(f"Song {i}")
-    moves = 0
+    started = time.perf_counter()
+
+    def too_slow(i):
+        return i % 1000 == 0 and time.perf_counter() - started > 2
+
+    for i in range(50000):
+        playlist.next()
+    for i in range(100000):
+        playlist.add_after_current(f"Next {i}")
+        if too_slow(i):
+            break
+    forward = 0
     while playlist.next():
-        moves += 1
-    assert moves == 999, "Not yet: next moves 999 times through 1,000 songs."
+        forward += 1
+        if too_slow(forward):
+            break
+    back = 0
     while playlist.previous():
-        moves -= 1
-    assert moves == 0, "Not yet: previous walks all the way back."
-    while playlist.remove_current() is not None:
-        pass
-    assert playlist.count == 0, "Not yet: removing the current song again and again empties the playlist."
+        back += 1
+        if too_slow(back):
+            break
+    for i in range(100000):
+        playlist.remove_current()
+        if too_slow(i):
+            break
+    seconds = time.perf_counter() - started
+    assert seconds < 2, f"Not yet: the long up-next queue ran past 2 seconds: it was stopped at {seconds:.1f} seconds. When next, previous, play next and remove each change a few links, the whole run takes well under one second."
+    assert forward == 149999, "Not yet: after 100,000 songs go in after Song 50000, next steps 149,999 times to the last song."
+    assert back == 199999, "Not yet: previous steps 199,999 times, back to the first song."
+    assert playlist.count == 100000, "Not yet: 100,000 of the 200,000 songs were removed."
+    assert playlist.current == "Next 50000", "Not yet: after the first 100,000 songs are removed from the front, Next 50000 plays."

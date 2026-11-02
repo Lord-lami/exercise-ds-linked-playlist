@@ -97,22 +97,47 @@ test("remove the only song, and then nothing", () => {
   assert.equal(playlist.removeCurrent(), null, "Not yet: an empty playlist has nothing to remove.");
 });
 
-test("a thousand songs, both ways", () => {
+test("a long up-next queue stays fast", () => {
   const playlist = new Playlist();
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 100000; i++) {
     playlist.add(`Song ${i}`);
   }
-  let moves = 0;
+  const started = performance.now();
+  const tooSlow = (i: number) => i % 1000 === 0 && performance.now() - started > 2000;
+
+  for (let i = 0; i < 50000; i++) {
+    playlist.next();
+  }
+  for (let i = 0; i < 100000; i++) {
+    playlist.addAfterCurrent(`Next ${i}`);
+    if (tooSlow(i)) {
+      break;
+    }
+  }
+  let forward = 0;
   while (playlist.next()) {
-    moves++;
+    forward++;
+    if (tooSlow(forward)) {
+      break;
+    }
   }
-  assert.equal(moves, 999, "Not yet: next moves 999 times through 1,000 songs.");
+  let back = 0;
   while (playlist.previous()) {
-    moves--;
+    back++;
+    if (tooSlow(back)) {
+      break;
+    }
   }
-  assert.equal(moves, 0, "Not yet: previous walks all the way back.");
-  while (playlist.removeCurrent() !== null) {
-    // keep removing
+  for (let i = 0; i < 100000; i++) {
+    playlist.removeCurrent();
+    if (tooSlow(i)) {
+      break;
+    }
   }
-  assert.equal(playlist.count, 0, "Not yet: removing the current song again and again empties the playlist.");
+  const seconds = (performance.now() - started) / 1000;
+  assert.ok(seconds < 2, `Not yet: the long up-next queue ran past 2 seconds: it was stopped at ${seconds.toFixed(1)} seconds. When next, previous, play next and remove each change a few links, the whole run takes well under one second.`);
+  assert.equal(forward, 149999, "Not yet: after 100,000 songs go in after Song 50000, next steps 149,999 times to the last song.");
+  assert.equal(back, 199999, "Not yet: previous steps 199,999 times, back to the first song.");
+  assert.equal(playlist.count, 100000, "Not yet: 100,000 of the 200,000 songs were removed.");
+  assert.equal(playlist.current, "Next 50000", "Not yet: after the first 100,000 songs are removed from the front, Next 50000 plays.");
 });
