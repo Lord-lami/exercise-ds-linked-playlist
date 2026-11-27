@@ -73,6 +73,9 @@ class Playlist:
 
         Big-O: (write it here)
         """
+        if self._current is not None and self._current.next is not None:
+            self._current = self._current.next
+            return True
         return False
 
     def previous(self):
@@ -85,6 +88,9 @@ class Playlist:
 
         Big-O: (write it here)
         """
+        if self._current is not None and self._current.prev is not None:
+            self._current = self._current.prev
+            return True
         return False
 
     def add_after_current(self, title):
@@ -100,7 +106,19 @@ class Playlist:
 
         Big-O: (write it here)
         """
-        pass  # your code here
+        node = SongNode(title)
+        if self.current is None:
+            self._current, self._head, self._tail = node, node, node
+        elif self._current.next is None:
+            node.prev = self._current
+            self._current.next = node
+            self._current.next, self._tail = node, node
+        else:
+            node.prev = self._current
+            node.next = self._current.next
+            self._current.next.prev = node
+            self._current.next = node
+        self._count += 1
 
     def remove_current(self):
         """
@@ -115,4 +133,28 @@ class Playlist:
 
         Big-O: (write it here)
         """
-        return None
+        if self.current is None:
+            return None
+        
+        title = self._current.title
+        if self._current.next is None and self._current.prev is None:
+            self._head, self._current, self._tail = None, None, None
+            return title
+        elif self._current.next is None and self._current.prev is not None:
+            node = self._current.prev
+            node.next = None
+            self._tail = node
+    
+        elif self._current.prev is None and self._current.next is not None:
+            node = self._current.next
+            node.prev = None
+            self._head = node
+
+        elif self._current.prev is not None and self._current.next is not None:
+            node = self._current.next
+            self._current.prev.next = self._current.next
+            self._current.next.prev = self._current.prev
+
+        self._current = node
+        self._count -= 1
+        return title
